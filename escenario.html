@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Escenario multiagente – Combo y Fluffy en El Colorado, Formosa</title>
+<script type="importmap">{"imports":{
+"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+"three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+"@elevenlabs/client":"https://cdn.jsdelivr.net/npm/@elevenlabs/client@0.7.0/+esm"}}</script>
+<style>
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{font:15px/1.4 "Trebuchet MS",system-ui,sans-serif;color:#2a1f14;background:#1c1424;display:flex;flex-direction:column}
+#wrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;background:#000}
+#stage{position:relative;overflow:hidden;background:#000}#c{width:100%;height:100%;display:block}
+#sub{position:absolute;left:4%;right:4%;bottom:5%;text-align:center;color:#fff;text-shadow:0 2px 6px #000;background:#0007;border-radius:10px;padding:.4em .7em;opacity:0;transition:opacity .3s}
+#ttl{position:absolute;top:8%;left:0;right:0;text-align:center;color:#fff;font:bold clamp(18px,4vw,44px) Arial,sans-serif;letter-spacing:.12em;text-shadow:0 3px 10px #000;opacity:0;pointer-events:none}
+#ttl.show{animation:t 3.5s ease}@keyframes t{0%{opacity:0}15%,75%{opacity:1}100%{opacity:0}}
+aside{background:#fff3e6;padding:10px 12px calc(10px + env(safe-area-inset-bottom));overflow:auto;max-height:44vh;display:grid;gap:8px;align-content:start}
+h1{font-size:1.05rem;margin:0}.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}.note{font-size:.78rem;opacity:.85;margin:0}
+button,select{font:inherit;border-radius:12px;border:2px solid #0000;padding:9px 12px;min-height:44px}button{background:#d9611b;color:#fff;cursor:pointer}button.alt{background:#fff;color:#2a1f14;border-color:#e0b890}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid #6a3de8}#stat{font-size:.85rem;font-weight:700}
+dialog{border:0;border-radius:16px;max-width:420px;background:#fff3e6;color:#2a1f14}
+@media (min-width:900px){body{flex-direction:row}aside{width:340px;max-height:none;height:100%}}
+</style></head><body>
+<div id="wrap"><div id="stage"><canvas id="c" aria-label="Escenario 3D: Combo y Fluffy frente al cartel de El Colorado, Formosa"></canvas><div id="ttl">EL COLORADO · FORMOSA</div><div id="sub" aria-live="polite"></div></div></div>
+<aside>
+<h1>Combo y Fluffy en El Colorado</h1>
+<p class="note">Combo y Fluffy son personajes virtuales impulsados por inteligencia artificial. El escenario es una recreación 3D inspirada en el cartel de bienvenida de El Colorado, Formosa; no es una foto ni un video real.</p>
+<div id="stat">Listo.</div>
+<div class="row"><button id="b1">Charla en vivo (voz)</button><button class="alt" id="b2">Guion con voz</button><button class="alt" id="b3">Demostración sin conexión</button><button class="alt" id="b4">Terminar</button></div>
+<div class="row"><label for="fmt">Formato:</label><select id="fmt"><option value="n">Pantalla completa de la página</option><option value="16">Cinematográfico 16:9</option><option value="9">Vertical 9:16</option></select><button class="alt" id="fs" type="button">Pantalla completa</button></div>
+<label class="row"><input type="checkbox" id="auto" checked> Cámara automática (si la apagás, arrastrá para girar)</label>
+<p class="note">Las voces son las de los agentes de ElevenLabs y consumen créditos. El micrófono se silencia: los personajes se hablan entre sí. En modo "guion" cada uno dice una frase preparada.</p>
+</aside>
+<dialog id="dlg"><form method="dialog"><p><b>Antes de empezar</b></p><p>La página va a conectarse a dos agentes de ElevenLabs (Combo y Fluffy), que usan además el proveedor de su modelo de lenguaje. El navegador puede pedirte permiso para el micrófono, pero se mantiene silenciado. Cada minuto de charla consume créditos. Los personajes son IA y pueden equivocarse.</p><div class="row"><button value="ok">Acepto</button><button class="alt" value="no">Cancelar</button></div></form></dialog>
+<script type="module">
+import * as THREE from 'three';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+const $=id=>document.getElementById(id),clamp=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),sleep=ms=>new Promise(r=>setTimeout(r,ms));
+// IDs de los agentes ya creados en ElevenLabs
+const AG={combo:{id:'agent_9701m4v8fpc2fcw87m3pm3j0pe65',name:'Combo',col:'#ffd27a'},fluffy:{id:'agent_0701m5f41q7qf22bsc44mvcc9bfz',name:'Fluffy',col:'#c9b8ff'}};
+const SCRIPT=[['combo','¡Hola, Fluffy! Mirá dónde estamos: frente al cartel de El Colorado, en Formosa, con las palmeras de fondo.'],
+['fluffy','¡Hola, Combo! Y con un atardecer de lujo: la luz tarda más en atravesar el aire y por eso el cielo se pinta de naranja y rosa.'],
+['combo','Dato de combo: Formosa es conocida como el Imperio del Verde, y acá se nota con tanto pasto y tanta palmera.'],
+['fluffy','Y muy cerquita pasa el río Bermejo, que marca el límite natural con la provincia del Chaco.'],
+['combo','Los ríos dibujan mapas, ¿no? Lo que no tengo confirmado es por qué el pueblo se llama El Colorado.'],
+['fluffy','Esa es una pregunta abierta. Mejor no inventar: se la podemos preguntar a alguien de acá.'],
+['combo','Lo que sí sé es que acá viven descendientes de inmigrantes europeos, familias criollas y pueblos originarios.'],
+['fluffy','Una ciudad con muchas historias para escuchar con respeto. Y el agua del río alguna vez fue nube, como yo.'],
+['combo','Jaja, qué forma poética de explicar el ciclo del agua. ¡Combo completo!'],
+['fluffy','Hasta la próxima, El Colorado. ¡Cielo despejado!']];
+// ---------- escena ----------
+const stage=$('stage'),cv=$('c'),R=new THREE.WebGLRenderer({canvas:cv,antialias:true});
+R.shadowMap.enabled=true;R.shadowMap.type=THREE.PCFSoftShadowMap;R.toneMapping=THREE.ACESFilmicToneMapping;
+const S=new THREE.Scene(),cam=new THREE.PerspectiveCamera(35,1,.1,120);
+const sk=document.createElement('canvas');sk.width=4;sk.height=256;const sx=sk.getContext('2d'),gr=sx.createLinearGradient(0,0,0,256);
+[[0,'#3a2a6e'],[.35,'#a24f7a'],[.62,'#f08a6a'],[.8,'#ffc27a'],[1,'#ffe3a8']].forEach(([o,c])=>gr.addColorStop(o,c));sx.fillStyle=gr;sx.fillRect(0,0,4,256);
+S.background=new THREE.CanvasTexture(sk);S.background.colorSpace=THREE.SRGBColorSpace;S.fog=new THREE.Fog(0xf4a878,20,70);
+S.environment=new THREE.PMREMGenerator(R).fromScene(new RoomEnvironment(),.04).texture;
+S.add(new THREE.HemisphereLight(0xffd0a8,0x3f6b2a,.9));
+const sun=new THREE.DirectionalLight(0xffa860,3);sun.position.set(-7,3.2,4);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-9,right:9,top:9,bottom:-6,near:1,far:30});S.add(sun);
+const rim=new THREE.DirectionalLight(0xff8a9a,1.2);rim.position.set(6,3,-6);S.add(rim);
+const gnd=new THREE.Mesh(new THREE.CircleGeometry(45,48),new THREE.MeshStandardMaterial({color:0x5aa23a,roughness:1}));gnd.rotation.x=-Math.PI/2;gnd.receiveShadow=true;S.add(gnd);
+const bx=(w,h,d,c,x,y,z)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color:c,roughness:.85}));m.position.set(x,y,z);m.castShadow=m.receiveShadow=true;S.add(m);return m};
+// cartel "EL COLORADO / FORMOSA" (marco verde, base de ladrillo)
+const GR=0x1f6b3a,BR=0xa9452b;bx(10,.5,1.4,BR,0,.25,-1.6);bx(9.4,.3,1,GR,0,.65,-1.6);
+bx(.12,3,.12,GR,-4.6,2.3,-1.6);bx(.12,3,.12,GR,4.6,2.3,-1.6);bx(9.4,.12,.12,GR,0,3.75,-1.6);bx(9.2,.08,.08,GR,0,2.9,-1.6);bx(9.2,.08,.08,GR,0,1.05,-1.6);
+const lc=document.createElement('canvas');lc.width=2048;lc.height=512;const lx=lc.getContext('2d');lx.fillStyle='#fff';lx.textAlign='center';
+lx.font='bold 130px Arial, sans-serif';lx.fillText('EL COLORADO',1024,150);lx.font='bold 330px Arial, sans-serif';lx.fillText('FORMOSA',1024,470);
+const lt=new THREE.CanvasTexture(lc);lt.colorSpace=THREE.SRGBColorSpace;const lp=new THREE.Mesh(new THREE.PlaneGeometry(8.8,2.2),new THREE.MeshStandardMaterial({map:lt,transparent:true,alphaTest:.4,roughness:.5}));lp.position.set(0,2.35,-1.52);lp.castShadow=true;S.add(lp);
+bx(14,.5,.5,0xb04a2e,0,.25,4.4);bx(2.2,.3,1.2,0xb04a2e,5.2,.15,3.2);bx(1.6,.55,.8,0xb04a2e,5.6,.28,3.9);
+// palmeras y vegetación
+const LG=new THREE.SphereGeometry(1,10,6),palm=(x,z,h,lean)=>{const g=new THREE.Group();g.position.set(x,0,z);g.rotation.z=lean;
+ const tr=new THREE.Mesh(new THREE.CylinderGeometry(.16,.27,h,10),new THREE.MeshStandardMaterial({color:0x7b5a3a,roughness:1}));tr.position.y=h/2;tr.castShadow=true;g.add(tr);
+ const lm=new THREE.MeshStandardMaterial({color:0x2f8a3c,roughness:.8,side:THREE.DoubleSide});
+ for(let i=0;i<14;i++){const a=i/14*6.283,lf=new THREE.Mesh(LG,lm);lf.scale.set(1.7,.04,.3);lf.position.set(Math.cos(a)*1.4,h-.1,Math.sin(a)*1.4);lf.rotation.set(0,-a,-.4);lf.castShadow=true;g.add(lf)}S.add(g)};
+palm(-5.2,-3,5.6,.06);palm(3.6,-3.6,6.6,-.05);palm(6.8,-2.2,4.4,.04);palm(-8,-5,6.2,-.04);
+for(let i=0;i<16;i++){const b=new THREE.Mesh(new THREE.SphereGeometry(1,12,8),new THREE.MeshStandardMaterial({color:0x2c5f2e,roughness:1}));b.scale.set(3+Math.random()*3,2+Math.random()*2.5,3);b.position.set(-22+i*3,1.2,-12-Math.random()*8);S.add(b)}
+const sunD=new THREE.Mesh(new THREE.SphereGeometry(2.6,24,16),new THREE.MeshBasicMaterial({color:0xffe2a0,fog:false}));sunD.position.set(-16,5,-38);S.add(sunD);
+// ---------- personajes ----------
+const G=new THREE.SphereGeometry(1,20,14),SPH=(m,r,x=0,y=0,z=0)=>{const o=new THREE.Mesh(G,m);o.scale.setScalar(r);o.position.set(x,y,z);o.castShadow=true;return o};
+const fib=(n,Rr,c,sy=1)=>{const a=[];for(let i=0;i<n;i++){const y=1-2*(i+.5)/n,q=Math.sqrt(1-y*y),t=i*2.399963;a.push([c[0]+Math.cos(t)*q*Rr,c[1]+y*Rr*sy,c[2]+Math.sin(t)*q*Rr])}return a};
+const starGeo=(Ro,Ri,d)=>{const s=new THREE.Shape();for(let i=0;i<10;i++){const a=Math.PI/2+i*Math.PI/5,q=i%2?Ri:Ro;i?s.lineTo(Math.cos(a)*q,Math.sin(a)*q):s.moveTo(Math.cos(a)*q,Math.sin(a)*q)}return new THREE.ExtrudeGeometry(s,{depth:d,bevelEnabled:true,bevelSize:.02,bevelThickness:.02,bevelSegments:2})};
+const glow=new THREE.MeshStandardMaterial({color:0xffe27a,emissive:0xffc233,emissiveIntensity:1.3});
+const bm=c=>new THREE.MeshBasicMaterial({color:c,toneMapped:false});
+function mouthMesh(){const cav=new THREE.Group(),dsh=()=>{const s=new THREE.Shape();s.moveTo(-1,0);s.absarc(0,0,1,Math.PI,Math.PI*2,false);s.lineTo(-1,0);return new THREE.ShapeGeometry(s,24)};
+ const add=(g,c,sx,sy,y,z)=>{const m=new THREE.Mesh(g,bm(c));m.scale.set(sx,sy,1);m.position.set(0,y,z);cav.add(m)};
+ add(dsh(),0x161616,1,1,0,0);add(dsh(),0xf5124f,.9,.8,-.1,.002);
+ const a=[],b=[];for(let i=0;i<=40;i++){const x=-.9+1.8*i/40,yb=-.1-.8*Math.sqrt(Math.max(0,1-(x/.9)**2)),yd=-.56-.3*(x/.8)**2;if(yd>yb){a.push([x,yd]);b.push([x,yb])}}
+ const ts=new THREE.Shape();ts.moveTo(...a[0]);a.forEach(p=>ts.lineTo(...p));b.reverse().forEach(p=>ts.lineTo(...p));add(new THREE.ShapeGeometry(ts),0xff6b8b,1,1,0,.004);add(new THREE.PlaneGeometry(1.7,.07),0xffffff,1,1,-.135,.004);return cav}
+function mkFace(plateCol,irisCol){const F=new THREE.Group();
+ const plate=SPH(new THREE.MeshPhysicalMaterial({color:plateCol,roughness:.55,sheen:.6,sheenColor:new THREE.Color(0xffd6f2)}),1,0,-.05,-.05);plate.scale.set(.82,.62,.28);F.add(plate);
+ const wm=bm(0xffffff),dm=bm(0x1b1245),im=new THREE.MeshStandardMaterial({color:irisCol,emissive:irisCol,emissiveIntensity:.35,roughness:.3});
+ const eyes=[-1,1].map(s=>{const g=new THREE.Group();g.position.set(s*.31,.06,.2);const fl=(m,rx,ry,x,y,z)=>{const o=new THREE.Mesh(G,m);o.position.set(x,y,z);o.scale.set(rx,ry,.03);g.add(o)};
+  fl(wm,.25,.27,0,0,0);fl(im,.19,.2,0,-.02,.02);fl(dm,.1,.105,0,-.02,.04);fl(wm,.06,.06,-.07*s,.08,.06);fl(wm,.03,.03,.07*s,-.08,.06);
+  const lash=new THREE.Mesh(new THREE.TorusGeometry(.25,.014,6,20,Math.PI*.8),dm);lash.position.set(0,.02,.03);lash.rotation.z=Math.PI*.1;g.add(lash);F.add(g);return g});
+ [-1,1].forEach(s=>{const c=new THREE.Mesh(G,new THREE.MeshBasicMaterial({color:0xff9ec4,transparent:true,opacity:.55}));c.scale.set(.13,.08,.02);c.position.set(s*.5,-.17,.18);F.add(c)});
+ const mouth=new THREE.Group();mouth.position.set(0,-.2,.24);F.add(mouth);const cav=mouthMesh();mouth.add(cav);return {F,eyes,cav}}
+function build(kind){const g=new THREE.Group(),Hd=new THREE.Group(),B=new THREE.Group();Hd.position.y=1.5;g.add(Hd,B);
+ const aL=new THREE.Group(),aR=new THREE.Group();aL.position.set(-.62,.85,0);aR.position.set(.62,.85,0);B.add(aL,aR);let face;
+ if(kind==='fluffy'){const fl=new THREE.MeshPhysicalMaterial({color:0xc4b2ff,roughness:.75,sheen:1,sheenColor:new THREE.Color(0xffffff),sheenRoughness:.35,emissive:0x6b4dff,emissiveIntensity:.22}),lite=new THREE.MeshPhysicalMaterial({color:0xf3ecff,roughness:.5,emissive:0xb9a5ff,emissiveIntensity:.12});
+  Hd.add(SPH(fl,.8));fib(30,.78,[0,0,0]).forEach(p=>Hd.add(SPH(fl,.32,...p)));B.add(SPH(fl,.5,0,.5,0));fib(16,.5,[0,.5,0],1.1).forEach(p=>B.add(SPH(fl,.26,...p)));
+  [[-.25,-.05,0,.26],[.25,-.05,0,.26],[0,-.15,.05,.22]].forEach(a=>B.add(SPH(fl,a[3],a[0],a[1],a[2])));
+  [[aL,-1],[aR,1]].forEach(([a,s])=>[[.2,0,.2],[.4,-.1,.17],[.55,-.2,.14]].forEach(q=>a.add(SPH(fl,q[2],s*q[0],q[1],0))));
+  const pts=[];for(let i=0;i<30;i++){const a=i*.42,r=.3*(1-i/36);pts.push(new THREE.Vector3(.12+Math.cos(a)*r,1+i*.01+Math.sin(a)*r,0))}
+  Hd.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),60,.05,8),lite));const st=new THREE.Mesh(starGeo(.2,.09,.05),glow);st.position.set(0,.58,.48);B.add(st);face=mkFace(0xe6dcff,0x7a5cff)}
+ else{const pe=new THREE.MeshPhysicalMaterial({color:0xfff9fc,roughness:.2,clearcoat:1,iridescence:1,iridescenceIOR:1.6,iridescenceThicknessRange:[250,650],sheen:.6,sheenColor:new THREE.Color(0xffc8ec)});
+  const sk=SPH(pe,.86);sk.scale.set(.88,.8,.83);Hd.add(sk);B.add(SPH(pe,.55,0,.6,0));
+  Hd.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(0,.7,0),new THREE.Vector3(.04,.95,0),new THREE.Vector3(.2,1.1,0),new THREE.Vector3(.36,1.08,0)]),24,.045,10),pe));
+  const bu=SPH(pe,.17,.5,1.08,0);bu.scale.set(.26,.14,.14);Hd.add(bu);
+  [[aL,-1],[aR,1]].forEach(([a,s])=>{const c=new THREE.Mesh(new THREE.CapsuleGeometry(.11,.3,8,16),pe);c.rotation.z=Math.PI/2;c.position.x=s*.3;c.castShadow=true;a.add(c);a.add(SPH(pe,.13,s*.58,0,0))});
+  [-1,1].forEach(s=>{const f=SPH(pe,.2,s*.25,.1,.12);f.scale.set(.22,.12,.28);B.add(f)});face=mkFace(0xfff7f0,0x8a4e24)}
+ face.F.position.set(0,0,.82);Hd.add(face.F);
+ return {k:kind,g,head:Hd,aL,aR,face,speaking:false,sim:false,last:'',bt:1+Math.random()*2,bl:0,ph:Math.random()*9,v:{o:0,r:0,w:0}}}
+const C={combo:build('combo'),fluffy:build('fluffy')};
+C.combo.g.position.set(-1.2,0,.9);C.combo.g.rotation.y=.28;C.fluffy.g.position.set(1.2,0,.9);C.fluffy.g.rotation.y=-.28;
+[C.combo,C.fluffy].forEach(c=>{c.g.scale.setScalar(.95);S.add(c.g)});
+// ---------- animación y cámara ----------
+let sess={},stop=false,auto=true;const clock=new THREE.Clock();
+const ctl=new OrbitControls(cam,cv);ctl.enabled=false;ctl.enablePan=false;
+const look=new THREE.Vector3(0,1.4,.5);cam.position.set(0,2,8.5);
+function shot(asp){const d=asp<1?1.6:1,who=C.combo.speaking||C.combo.sim?'combo':(C.fluffy.speaking||C.fluffy.sim?'fluffy':'');
+ if(who==='combo')return {p:[1.9,1.7,5.2*d],l:[-1,1.4,.7]};if(who==='fluffy')return {p:[-1.9,1.7,5.2*d],l:[1,1.4,.7]};
+ return anyOn?{p:[0,1.8,6.4*d],l:[0,1.4,.6]}:{p:[0,2,8.6*d],l:[0,1.4,.4]}}
+let anyOn=false;
+function lipFor(c,t){const s=sess[c.k];let o=0,r=0,w=0;
+ if(c.sim){o=.25+.45*Math.abs(Math.sin(t*12+c.ph))*Math.abs(Math.sin(t*3.1+c.ph));w=.3*Math.abs(Math.sin(t*5))}
+ else if(s&&c.speaking){const vol=s.getOutputVolume(),f=s.getOutputByteFrequencyData(),n=f.length||1;
+  const avg=(a,b)=>{let q=0,m=0;for(let i=Math.floor(n*a);i<Math.ceil(n*b);i++){q+=f[i];m++}return m?q/m/255:0};
+  const lo=avg(0,.06),mi=avg(.06,.15),hi=avg(.15,.4),tot=lo+mi+hi+1e-3;
+  if(vol>=.035){o=clamp(vol*2.4);if(hi/tot>.28){w=.9;o*=.55}else if(lo/tot>.55){r=.9;o*=.7}else w=.35}}
+ return [o,r,w]}
+function tick(){const dt=Math.min(clock.getDelta(),.05),t=clock.elapsedTime,k=1-Math.exp(-dt*22);
+ [C.combo,C.fluffy].forEach((c,i)=>{const sp=c.speaking||c.sim;
+  c.bt-=dt;if(c.bt<0){c.bl=1;c.bt=1.8+Math.random()*3.5}c.bl=Math.max(0,c.bl-dt*7);const b=c.bl>0?Math.abs(Math.sin(c.bl*Math.PI)):0;c.face.eyes.forEach(e=>e.scale.set(1,1-.92*b,1));
+  const [o,r,w]=lipFor(c,t);c.v.o+=(o-c.v.o)*k;c.v.r+=(r-c.v.r)*k;c.v.w+=(w-c.v.w)*k;const sm=sp?.5:.7;
+  c.face.cav.scale.set(.17*(1+c.v.w*.5-c.v.r*.45+.1*sm),.045+.03*sm+c.v.o*.22,1);
+  c.g.position.y=Math.sin(t*1.3+c.ph)*.06+(sp?Math.abs(Math.sin(t*6))*.03:0);
+  const ty=(i?-1:1)*.3;c.head.rotation.y+=(ty-c.head.rotation.y)*Math.min(1,dt*3);c.head.rotation.z=Math.sin(t*.7+c.ph)*.04+(sp?Math.sin(t*4)*.04:0);c.head.rotation.x=sp?-Math.abs(Math.sin(t*5))*.03:0;
+  c.aL.rotation.z=.4+Math.sin(t*1.3+c.ph)*.05;c.aR.rotation.z=-.4-Math.sin(t*1.3+c.ph)*.05+(sp?.5+Math.sin(t*6)*.25:0)});
+ const asp=cam.aspect;if(auto){const s=shot(asp),q=1-Math.exp(-dt*2.2);cam.position.x+=(s.p[0]+Math.sin(t*.25)*.3-cam.position.x)*q;cam.position.y+=(s.p[1]-cam.position.y)*q;cam.position.z+=(s.p[2]-cam.position.z)*q;look.x+=(s.l[0]-look.x)*q;look.y+=(s.l[1]-look.y)*q;look.z+=(s.l[2]-look.z)*q;cam.lookAt(look)}else ctl.update();
+ R.render(S,cam);requestAnimationFrame(tick)}
+function layout(){const wrap=$('wrap'),fm=$('fmt').value,ww=wrap.clientWidth,wh=wrap.clientHeight,r=fm==='16'?16/9:fm==='9'?9/16:ww/wh;let w=ww,h=ww/r;if(h>wh){h=wh;w=h*r}
+ stage.style.width=w+'px';stage.style.height=h+'px';R.setPixelRatio(Math.min(devicePixelRatio,2));R.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix();$('sub').style.fontSize=Math.max(12,w/38)+'px'}
+new ResizeObserver(layout).observe($('wrap'));$('fmt').onchange=layout;layout();tick();
+$('auto').onchange=e=>{auto=e.target.checked;ctl.enabled=!auto;if(!auto)ctl.target.copy(look)};
+$('fs').onclick=()=>stage.requestFullscreen&&stage.requestFullscreen();
+// ---------- subtítulos y estado ----------
+const st=t=>$('stat').textContent=t;
+function sub(k,txt){const e=$('sub');e.textContent='';const b=document.createElement('b');b.style.color=AG[k].col;b.textContent=AG[k].name+': ';e.append(b,document.createTextNode(txt));e.style.opacity=1}
+function title(){const e=$('ttl');e.classList.remove('show');void e.offsetWidth;e.classList.add('show')}
+// ---------- conversación ----------
+async function done(k){const t0=Date.now();while(!C[k].speaking){if(stop||Date.now()-t0>20000)return false;await sleep(120)}while(C[k].speaking){if(stop)return false;await sleep(150)}await sleep(350);return true}
+async function open(k,textOnlyUnused){const {Conversation}=await import('@elevenlabs/client');
+ sess[k]=await Conversation.startSession({agentId:AG[k].id,connectionType:'websocket',
+  onModeChange:({mode})=>{C[k].speaking=mode==='speaking'},
+  onMessage:({message,source})=>{if(source==='ai'){C[k].last=message;sub(k,message)}},
+  onError:e=>{st('Error de conexión con '+AG[k].name);console.error(e)},
+  onDisconnect:()=>{delete sess[k]}});
+ try{sess[k].setMicMuted(true)}catch{}}
+async function consent(){const d=$('dlg');d.showModal();return await new Promise(r=>d.addEventListener('close',()=>r(d.returnValue==='ok'),{once:true}))}
+async function begin(kind){if(Object.keys(sess).length||anyOn)return;stop=false;anyOn=true;title();
+ try{if(kind==='demo'){st('Demostración sin conexión (sin voz).');for(const [k,tx] of SCRIPT){if(stop)break;C[k].sim=true;sub(k,tx);await sleep(Math.max(1800,tx.length*62));C[k].sim=false;await sleep(400)}}
+ else{if(!await consent()){anyOn=false;return}st('Conectando con los agentes…');
+  await open('combo');st('Combo conectado. Esperando su saludo…');await done('combo');await open('fluffy');st('Fluffy conectado. Esperando su saludo…');await done('fluffy');
+  st(kind==='live'?'Charla en vivo. Los dos hablan entre sí (micrófono silenciado).':'Guion con voz.');
+  if(kind==='script'){for(const [k,tx] of SCRIPT){if(stop)break;sess[k].sendUserMessage('Decí exactamente esta frase, con tu tono y sin agregar nada más: «'+tx+'»');if(!await done(k))break}}
+  else{let s='combo',l='fluffy';sess.combo.sendUserMessage('Estás con Fluffy frente al cartel de bienvenida de El Colorado, Formosa, al atardecer. Seguí la charla con una curiosidad sobre el lugar. Una o dos frases.');
+   for(let i=0;i<10&&!stop;i++){if(!await done(s))break;const tx=C[s].last;C[s].last='';if(!tx)break;
+    sess[l].sendUserMessage(AG[s].name+' te dice: «'+tx+'». Respondele en una o dos frases y seguí la charla sobre El Colorado. Si no tenés un dato confirmado, decilo.');[s,l]=[l,s]}}}
+ }catch(e){console.error(e);st('No se pudo completar la charla. Revisá el micrófono y la conexión.')}
+ await end(true)}
+async function end(natural){stop=true;for(const k in sess){try{await sess[k].endSession()}catch{}}sess={};anyOn=false;[C.combo,C.fluffy].forEach(c=>{c.speaking=false;c.sim=false});if(natural&&$('stat').textContent.indexOf('No se pudo')<0)st('Escena terminada.')}
+$('b1').onclick=()=>begin('live');$('b2').onclick=()=>begin('script');$('b3').onclick=()=>begin('demo');$('b4').onclick=()=>end(false);
+
+</script></body></html>
